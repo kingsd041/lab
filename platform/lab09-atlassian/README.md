@@ -21,6 +21,8 @@
 - PRD in confluence => user story => backlog 
 - scrum board (kanban)
 - active sprint
+  - 拉取分支时，自动更新 Jira Story 卡片到 In Progress 状态
+  - PR Merged时，自动更新 Jira Story 卡片到 Resolved 状态
 - kanban 
 - close sprint (1 released, 1 undone)
 - retrospective
@@ -45,3 +47,9 @@
 - close jira
 
 ### deployment management (yy)
+- Jira Service Management：变更管理：
+- 在CD中，到Production部署时，会自动创建线上变更申请单；
+- CD关联的代码仓库对应的服务变更的Approvers收到审批提醒
+- Service Approvers审批通过
+- CD生产环境部署继续
+- CD生成环境部署完成（成功），Jira Story卡片自动更新到 Done 状态
