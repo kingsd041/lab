@@ -1,4 +1,6 @@
-![](https://rancher.com/assets/img/brand-guidelines/project-logos/k3s/horizontal/logo-horizontal-k3s.svg)
+<div align=center><img src="https://rancher.com/assets/img/brand-guidelines/project-logos/k3s/horizontal/logo-horizontal-k3s.svg" width="500px"></div>
+
+---
 
 # K3s 介绍
 
