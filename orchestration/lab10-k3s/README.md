@@ -80,41 +80,59 @@ K3s 的性能取决于数据库的性能。为了确保最佳速度，我们建�
 
 ![](https://docs.rancher.cn/assets/images/k3s-architecture-single-server-42bb3c4899985b4f6d8fd0e2130e3c0e.png)
 
-#### 启动 K3s Server
+**官方安装脚本：**
 
 ```
+# 安装 k3s server 节点：
 curl -sfL https://get.k3s.io | sh -
-```
 
-国内推荐使用：
-
-```
-curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | \
-    INSTALL_K3S_MIRROR=cn sh - \
-    --system-default-registry "registry.cn-hangzhou.aliyuncs.com"
-```
-
-#### 添加 K3s Agent 节点
-
-```
+# 安装 k3s agent 节点：
 curl -sfL https://get.k3s.io | \
     K3S_URL=https://myserver:6443 \
     K3S_TOKEN=mynodetoken \
     sh -
 ```
 
+#### 安装环境
+
+| 角色 | 主机名 | IP |
+| ---- | ---- | ---- |
+| k3s server | k3s-single-m | 10.24.12.139 |
+| k3s agent | k3s-single-w1 | 10.24.12.140 |
+| k3s agent | k3s-single-w2 | 10.24.12.142 |
+
+#### 部署结构图
+
+![](https://tva1.sinaimg.cn/large/e6c9d24ely1h5j0cps6tfj218o0r63zv.jpg)
+
+#### 启动 K3s Server
+
 国内推荐使用：
 
 ```
-curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
-    K3S_URL=https://myserver:6443 \
-    K3S_TOKEN=mynodetoken sh - \
+curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | \
+    INSTALL_K3S_MIRROR=cn \
+    K3S_TOKEN=devops \
+    sh -s - \
     --system-default-registry "registry.cn-hangzhou.aliyuncs.com"
+```
+
+#### 添加 K3s Agent 节点
+
+分别在两个 agent 主机上执行以下安装 k3s agent 命令：
+
+国内推荐使用：
+```
+curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
+    K3S_URL=https://10.24.12.139:6443 \
+    K3S_TOKEN=devops \
+    sh -s -
 ```
 
 ## 高可用安装
 
 ### 使用外部数据库实现高可用安装
+
 
 ![](https://docs.rancher.cn/assets/images/k3s-architecture-ha-server-46bf4c38e210246bda5920127bbecd53.png)
 
@@ -132,30 +150,52 @@ K3s 支持以下外部数据存储选项：
 - 外部数据存储 (与单个 k3s server 设置中使用的嵌入式 SQLite 数据存储相反)
 - 固定的注册地址，位于 server 节点的前面，以允许 agent 节点向集群注册
 
+**安装环境：**
+
+| 角色 | 主机名 | IP |
+| ---- | ---- | ---- |
+| k3s server 1 | k3s-ha-1 | 10.24.12.141 |
+| k3s server 2 | k3s-ha-2 | 10.24.12.143 |
+| k3s agent | k3s-ha-2 | 10.24.12.144 |
+| DB | k3s-ha-4 | 10.24.12.145 |
+
+安装 mysql 数据库：
+> 在 DB 
+
+```
+docker run --name some-mysql --restart=unless-stopped -p 3306:3306 -e MYSQL_ROOT_PASSWORD=password -d mysql:5.7
+```
+
 添加第一个 server 节点：
 
 ```
 curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
     sh -s - \
     server \
-    --token=SECRET \
-    --datastore-endpoint="mysql://username:password@tcp(hostname:3306)/database-name" \
+    --token=devops \
+    --datastore-endpoint="mysql://root:password@tcp(10.24.12.145:3306)/k3s_db" \
     --system-default-registry "registry.cn-hangzhou.aliyuncs.com"
 ```
 
 加入其他的 server 节点:
 
 ```
-# 检索 token
-cat /var/lib/rancher/k3s/server/token
-
 # 然后可以使用 token添加其他 server 节点:
 curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
     sh -s - \
     server \
-    --token=SECRET \
-    --datastore-endpoint="mysql://username:password@tcp(hostname:3306)/database-name" \
+    --token=devops \
+    --datastore-endpoint="mysql://root:password@tcp(10.24.12.145:3306)/k3s_db" \
     --system-default-registry "registry.cn-hangzhou.aliyuncs.com"
+```
+
+加入 agent 节点：
+
+```
+curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
+    K3S_URL=https://10.24.12.141:6443 \
+    K3S_TOKEN=devops \
+    sh -s -
 ```
 
 更多集群数据存储选项，请参考 [K3s 文档](https://docs.rancher.cn/docs/k3s/installation/datastore/_index/)
@@ -168,9 +208,10 @@ curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh 
 
 ```
 curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
-    K3S_TOKEN=SECRET sh -s -
+    K3S_TOKEN=SECRET sh -s - \
     server \
-    --cluster-init
+    --cluster-init \
+    --system-default-registry "registry.cn-hangzhou.aliyuncs.com"
 ```
 
 启动第一台 server 后，使用共享密钥将第二台和第三台 server 加入集群。
@@ -178,13 +219,14 @@ curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh 
 ```
 curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
     K3S_TOKEN=SECRET sh -s - server \
-    --server https://<ip or hostname of server1>:6443
+    --server https://<ip or hostname of server1>:6443 \
+    --system-default-registry "registry.cn-hangzhou.aliyuncs.com"
 ```
 
 查询 ETCD 集群状态：
 
 ```
-ETCDCTL_ENDPOINTS='https://172.31.12.136:2379,https://172.31.4.43:2379,https://172.31.4.190:2379' \
+ETCDCTL_ENDPOINTS='https://< server ip >:2379,https://< server ip >:2379,https://< server ip >:2379' \
 ETCDCTL_CACERT='/var/lib/rancher/k3s/server/tls/etcd/server-ca.crt' \
 ETCDCTL_CERT='/var/lib/rancher/k3s/server/tls/etcd/server-client.crt' \
 ETCDCTL_KEY='/var/lib/rancher/k3s/server/tls/etcd/server-client.key' \
@@ -217,6 +259,12 @@ Flannel 的默认后端是 VXLAN。要启用加密，请使用下面的 IPSec（
 | `--flannel-backend=ipsec`     | 使用 IPSEC 后端，对网络流量进行加密。                                   |
 | `--flannel-backend=host-gw`   | 使用 host-gw 后端。                                                     |
 | `--flannel-backend=wireguard` | 使用 WireGuard 后端，对网络流量进行加密。可能需要额外的内核模块和配置。 |
+
+```
+curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | \
+        INSTALL_K3S_EXEC="--flannel-backend=host-gw" \
+        INSTALL_K3S_MIRROR=cn sh -
+```
 
 ## 自定义 CNI
 
@@ -501,6 +549,14 @@ k3s server \
   --etcd-s3-secret-key=<S3-SECRET-KEY>
 ```
 
+# 使用 docker 作为容器运行时
+
+```
+curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
+    INSTALL_K3S_VERSION="v1.24.4+k3s1" sh -s - \
+    --docker
+```
+
 # Helm
 
 ## 自动部署 Helm charts
@@ -576,6 +632,50 @@ spec:
 
 K3s 提供了一个名为[Klipper Load Balancer](https://github.com/rancher/klipper-lb)的负载均衡器，它可以使用可用的主机端口。 允许创建 LoadBalancer 类型的 Service，但不包括 LB 的实现。某些 LB 服务需要云提供商，例如 Amazon EC2 或 Microsoft Azure。相比之下，K3s service LB 使得可以在没有云提供商的情况下使用 LB 服务。
 
+## 示例
+
+```
+# service_lb_demo.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: suse-demo
+  labels:
+    app: suse-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: suse-demo
+  template:
+    metadata:
+      labels:
+        app: suse-demo
+    spec:
+      containers:
+      - name: suse-demo-backend
+        image: bluezd/suse-demo-list-projects:test
+      - name: suse-demo-frontend
+        image: bluezd/suse-demo-frontend:test
+        ports:
+        - containerPort: 8000
+        env:
+          - name: LIST_PROJECTS_ENDPOINT
+            value: "http://localhost:8001/projects"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: suse-demo-svc
+spec:
+  type: LoadBalancer
+  selector:
+    app: suse-demo
+  ports:
+    - port: 8000
+      targetPort: 8000
+```
+
 ## Service LB 如何工作
 
 K3s 创建了一个控制器，该控制器为 service load balancer 创建了一个 Pod，这个 Pod 是[Service](https://kubernetes.io/docs/concepts/services-networking/service/)类型的 Kubernetes 对象。
@@ -589,10 +689,6 @@ Service LB 控制器会监听其他 Kubernetes Services。当它找到一个 Ser
 只要使用不同的端口，就可以在同一节点上运行多个 Services。
 
 如果您尝试创建一个在 80 端口上监听的 Service LB，Service LB 将尝试在集群中找到 80 端口的空闲主机。如果该端口没有可用的主机，LB 将保持 Pending 状态。
-
-## 用法
-
-在 K3s 中创建一个[LoadBalancer 类型的 Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer)。
 
 ### 从节点中排除 Service LB
 
@@ -609,14 +705,6 @@ svccontroller.k3s.cattle.io/enablelb
 要禁用嵌入式 LB，请使用`--disable servicelb`选项运行 k3s server。
 
 如果您希望运行其他 LB，例如 MetalLB，这是必需的。
-
-# 使用 docker 作为容器运行时
-
-```
-curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
-    INSTALL_K3S_VERSION=v1.23.9+k3s1 sh -s - \
-    --docker
-```
 
 # 周边项目
 
