@@ -20,7 +20,7 @@ K3s 是一个经过 CNCF 认证的轻量级的 Kubernetes 发行版，可用于�
 - CNCF 认证的 Kubernetes 发行版
 - 不到 100MB 二进制包，500MB 内存消耗
 - 单一进程包含 Kubernetes master, Kubelet 和 containerd
-- 支持 SQLite/Mysql/PostgreSQL 和 etcd
+- 支持 SQLite/Mysql/PostgreSQL/MariaDB 和 etcd
 - 同时为 x86_64, Arm64, 和 Armv7 平台发布
 
 ![](https://tva1.sinaimg.cn/large/e6c9d24ely1h5hmpty0wbj21bm0u0wh3.jpg)
@@ -95,11 +95,11 @@ curl -sfL https://get.k3s.io | \
 
 #### 安装环境
 
-| 角色 | 主机名 | IP |
-| ---- | ---- | ---- |
-| k3s server | k3s-single-m | 10.24.12.139 |
-| k3s agent | k3s-single-w1 | 10.24.12.140 |
-| k3s agent | k3s-single-w2 | 10.24.12.142 |
+| 角色       | 主机名        | IP           |
+| ---------- | ------------- | ------------ |
+| k3s server | k3s-single-m  | 10.24.12.139 |
+| k3s agent  | k3s-single-w1 | 10.24.12.140 |
+| k3s agent  | k3s-single-w2 | 10.24.12.142 |
 
 #### 部署结构图
 
@@ -122,6 +122,7 @@ curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh 
 分别在两个 agent 主机上执行以下安装 k3s agent 命令：
 
 国内推荐使用：
+
 ```
 curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh | INSTALL_K3S_MIRROR=cn \
     K3S_URL=https://10.24.12.139:6443 \
@@ -132,7 +133,6 @@ curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh 
 ## 高可用安装
 
 ### 使用外部数据库实现高可用安装
-
 
 ![](https://docs.rancher.cn/assets/images/k3s-architecture-ha-server-46bf4c38e210246bda5920127bbecd53.png)
 
@@ -152,15 +152,16 @@ K3s 支持以下外部数据存储选项：
 
 **安装环境：**
 
-| 角色 | 主机名 | IP |
-| ---- | ---- | ---- |
+| 角色         | 主机名   | IP           |
+| ------------ | -------- | ------------ |
 | k3s server 1 | k3s-ha-1 | 10.24.12.141 |
 | k3s server 2 | k3s-ha-2 | 10.24.12.143 |
-| k3s agent | k3s-ha-2 | 10.24.12.144 |
-| DB | k3s-ha-4 | 10.24.12.145 |
+| k3s agent    | k3s-ha-2 | 10.24.12.144 |
+| DB           | k3s-ha-4 | 10.24.12.145 |
 
 安装 mysql 数据库：
-> 在 DB 
+
+> 在 DB
 
 ```
 docker run --name some-mysql --restart=unless-stopped -p 3306:3306 -e MYSQL_ROOT_PASSWORD=password -d mysql:5.7
@@ -199,6 +200,8 @@ curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh 
 ```
 
 更多集群数据存储选项，请参考 [K3s 文档](https://docs.rancher.cn/docs/k3s/installation/datastore/_index/)
+
+**生产案例：** https://mp.weixin.qq.com/s/0Wk2MzfWqMqt8DfUK_2ICA
 
 ### 嵌入式 DB 的高可用
 
@@ -559,56 +562,9 @@ curl -sfL https://rancher-mirror.oss-cn-beijing.aliyuncs.com/k3s/k3s-install.sh 
     --docker
 ```
 
-# Helm
+# 自动部署清单
 
-## 自动部署 Helm charts
-
-在`/var/lib/rancher/k3s/server/manifests`中找到的任何 Kubernetes 清单将以类似`kubectl apply`的方式自动部署到 K3s。以这种方式部署的 manifests 是作为 AddOn 自定义资源来管理的，可以通过运行`kubectl get addon -A`来查看。你会发现打包组件的 AddOns，如 CoreDNS、Local-Storage、Traefik 等。AddOns 是由部署控制器自动创建的，并根据它们在 manifests 目录下的文件名命名。
-
-也可以将 Helm Chart 作为 AddOns 部署。K3s 包括一个[Helm Controller](https://github.com/rancher/helm-controller/)，它使用 HelmChart Custom Resource Definition(CRD)管理 Helm Chart。
-
-## 使用 Helm CRD
-
-[HelmChart CRD](https://github.com/rancher/helm-controller#helm-controller)捕获了大多数你通常会传递给`helm`命令行工具的选项。下面是一个例子，说明如何从默认的 Chart 资源库中部署 Grafana，覆盖一些默认的 Chart 值。请注意，HelmChart 资源本身在 `kube-system` 命名空间，但 Chart 资源将被部署到 `monitoring` 命名空间。
-
-```yaml
-apiVersion: helm.cattle.io/v1
-kind: HelmChart
-metadata:
-  name: grafana
-  namespace: kube-system
-spec:
-  chart: stable/grafana
-  targetNamespace: monitoring
-  set:
-    adminPassword: "NotVerySafePassword"
-  valuesContent: |-
-    image:
-      tag: master
-    env:
-      GF_EXPLORE_ENABLED: true
-    adminUser: admin
-    sidecar:
-      datasources:
-        enabled: true
-```
-
-### HelmChart 字段定义
-
-| 字段                 | 默认值  | 描述                                                                  | Helm Argument / Flag Equivalent |
-| :------------------- | :------ | :-------------------------------------------------------------------- | :------------------------------ |
-| name                 | N/A     | Helm Chart 名称                                                       | NAME                            |
-| spec.chart           | N/A     | 仓库中的 Helm Chart 名称，或完整的 HTTPS URL（.tgz）。                | CHART                           |
-| spec.targetNamespace | default | Helm Chart 目标命名空间                                               | `--namespace`                   |
-| spec.version         | N/A     | Helm Chart 版本(从版本库安装时使用的版本号)                           | `--version`                     |
-| spec.repo            | N/A     | Helm Chart 版本库 URL 地址                                            | `--repo`                        |
-| spec.helmVersion     | v3      | Helm 的版本号，可选值为 `v2` 和`v3`，默认值为 `v3`                    | N/A                             |
-| spec.set             | N/A     | 覆盖简单的默认 Chart 值。这些值优先于通过 valuesContent 设置的选项。  | `--set` / `--set-string`        |
-| spec.jobImage        |         | 指定安装 helm chart 时要使用的镜像。如：rancher/klipper-helm:v0.3.0。 |                                 |
-| spec.valuesContent   | N/A     | 通过 YAML 文件内容覆盖复杂的默认 Chart 值。                           | `--values`                      |
-| spec.chartContent    | N/A     | Base64 编码的 Chart 存档.tgz - 覆盖 spec.chart。                      | CHART                           |
-
-放在`/var/lib/rancher/k3s/server/static/`中的内容可以通过 Kubernetes APIServer 从集群内匿名访问。这个 URL 可以使用`spec.chart`字段中的特殊变量`%{KUBERNETES_API}%`进行模板化。例如，打包后的 Traefik 组件从`https://%{KUBERNETES_API}%/static/charts/traefik-1.81.0.tgz`加载其 Chart。
+在 `/var/lib/rancher/k3s/server/manifests` 中找到的任何文件都会以类似 `kubectl apply` 的方式自动部署到 Kubernetes，在启动和在磁盘上更改文件时都是如此。从该目录中删除文件不会从集群中删除相应的资源。
 
 # Service Load Balancer
 
@@ -621,41 +577,37 @@ K3s 提供了一个名为[Klipper Load Balancer](https://github.com/rancher/klip
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: suse-demo
+  name: nginx-deployment
   labels:
-    app: suse-demo
+    app: nginx
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
-      app: suse-demo
+      app: nginx
   template:
     metadata:
       labels:
-        app: suse-demo
+        app: nginx
     spec:
       containers:
-      - name: suse-demo-backend
-        image: bluezd/suse-demo-list-projects:test
-      - name: suse-demo-frontend
-        image: bluezd/suse-demo-frontend:test
+      - name: nginx
+        image: kingsd/nginx:install-tools
         ports:
-        - containerPort: 8000
-        env:
-          - name: LIST_PROJECTS_ENDPOINT
-            value: "http://localhost:8001/projects"
+        - containerPort: 80
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: suse-demo-svc
+  name: nginx
 spec:
   type: LoadBalancer
   selector:
-    app: suse-demo
+    app: nginx
   ports:
     - port: 8000
-      targetPort: 8000
+      targetPort: 80
 ```
 
 ## Service LB 如何工作
